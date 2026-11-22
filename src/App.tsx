@@ -320,170 +320,200 @@ function ConfirmationScreen({ delivery, includeCosts, onNew, onDone }: { deliver
 
 function generatePdf(delivery: DeliveryState, code: string, includeCosts: boolean) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const margin = 12;
-  const contentWidth = 186;
-  const bottom = 285;
+  const margin = 8;
+  const contentWidth = 194;
+  const pageBottom = 289;
   const worker = delivery.worker;
-  let y = 15;
+  const checkedItems = delivery.items.filter((item) => item.checked);
+  let y = 7;
 
-  const wrapped = (value: string, width: number, size: number) => {
+  const split = (value: string, width: number, size: number) => {
     doc.setFontSize(size);
     return doc.splitTextToSize(value || '—', width);
   };
-  const line = (lineY: number) => doc.line(margin, lineY, margin + contentWidth, lineY);
-  const newPage = (label: string) => {
+  const centeredText = (value: string, x: number, top: number, width: number, height: number, size: number, bold = false) => {
+    const lines = split(value, width - 4, size);
+    const lineHeight = Math.max(2.3, size * 0.38);
+    const startY = top + height / 2 - ((lines.length - 1) * lineHeight) / 2;
+    doc.setFont('helvetica', bold ? 'bold' : 'normal');
+    doc.setFontSize(size);
+    doc.text(lines, x + width / 2, startY, { align: 'center', lineHeightFactor: 1.05 });
+  };
+  const leftText = (value: string, x: number, top: number, width: number, height: number, size: number, bold = false) => {
+    const lines = split(value, width - 4, size);
+    const lineHeight = Math.max(2.3, size * 0.38);
+    const startY = top + height / 2 - ((lines.length - 1) * lineHeight) / 2;
+    doc.setFont('helvetica', bold ? 'bold' : 'normal');
+    doc.setFontSize(size);
+    doc.text(lines, x + 2, startY, { lineHeightFactor: 1.05 });
+  };
+  const drawFullRow = (height: number, label: string, size = 6.2) => {
+    doc.rect(margin, y, contentWidth, height);
+    centeredText(label, margin, y, contentWidth, height, size, true);
+    y += height;
+  };
+  const startContinuationPage = (label: string) => {
     doc.addPage();
-    y = 17;
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(43, 55, 66);
-    doc.text(label, margin, y);
-    line(y + 4);
-    y += 12;
+    y = 10;
+    doc.setDrawColor(43, 55, 66);
+    doc.setTextColor(23, 50, 77);
+    doc.setLineWidth(0.35);
+    doc.rect(margin, y, contentWidth, 13);
+    centeredText('SEGUREPP', margin, y, 34, 13, 10, true);
+    centeredText(label, margin + 34, y, contentWidth - 34, 13, 7.2, true);
+    y += 18;
+  };
+  const drawEquipmentRow = (text: string, rowHeight: number) => {
+    doc.rect(margin, y, contentWidth, rowHeight);
+    leftText(text, margin, y, contentWidth, rowHeight, 5.6);
+    y += rowHeight;
   };
   const ensureSpace = (height: number, label: string) => {
-    if (y + height > bottom) newPage(label);
-  };
-  const sectionTitle = (title: string) => {
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(43, 55, 66);
-    doc.text(title, margin, y);
-    line(y + 3);
-    y += 9;
+    if (y + height > pageBottom) startContinuationPage(label);
   };
 
   doc.setDrawColor(43, 55, 66);
   doc.setTextColor(23, 50, 77);
   doc.setLineWidth(0.35);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(15);
-  doc.text('SEGUREPP', margin, y + 3);
-  const titleLines = wrapped('REGISTRO DE EQUIPOS DE SEGURIDAD O EMERGENCIA', 112, 10.5);
-  doc.text(titleLines, 50, y + 1, { lineHeightFactor: 1.15 });
-  doc.setFontSize(7);
-  doc.text('CÓDIGO:', 164, y);
-  doc.setFont('helvetica', 'normal');
-  doc.text(code, 164, y + 5, { maxWidth: 34 });
-  doc.setFont('helvetica', 'bold');
-  doc.text('VERSIÓN:', 164, y + 12);
-  doc.setFont('helvetica', 'normal');
-  doc.text('01', 164, y + 17);
-  y = 34;
-  line(y);
-  y += 9;
+  const headerHeight = 17;
+  const logoWidth = 30;
+  const codeWidth = 36;
+  const titleWidth = contentWidth - logoWidth - codeWidth;
+  doc.rect(margin, y, contentWidth, headerHeight);
+  doc.line(margin + logoWidth, y, margin + logoWidth, y + headerHeight);
+  doc.line(margin + logoWidth + titleWidth, y, margin + logoWidth + titleWidth, y + headerHeight);
+  centeredText('SEGUREPP', margin, y, logoWidth, headerHeight, 9.5, true);
+  centeredText('REGISTRO DE EQUIPOS DE SEGURIDAD O EMERGENCIA', margin + logoWidth, y, titleWidth, headerHeight, 8.4, true);
+  doc.line(margin + logoWidth + titleWidth, y + headerHeight / 2, margin + contentWidth, y + headerHeight / 2);
+  leftText('CÓDIGO:', margin + logoWidth + titleWidth, y, codeWidth, headerHeight / 2, 6, true);
+  leftText(code, margin + logoWidth + titleWidth, y + headerHeight / 2, codeWidth, headerHeight / 2, 5.8);
+  y += headerHeight + 3;
 
-  sectionTitle('DATOS DEL EMPLEADOR');
-  const employer: Array<[string, string]> = [
-    ['1. RAZÓN SOCIAL O DENOMINACIÓN SOCIAL', 'Industrias Andinas S.A.C.'],
-    ['2. RUC', '20604578129'],
-    ['3. DOMICILIO', 'Av. Néstor Gambetta 1450, Callao'],
-    ['4. ACTIVIDAD ECONÓMICA', 'Logística y distribución'],
-    ['5. N° TRABAJADORES', '86'],
+  drawFullRow(5, 'DATOS DEL EMPLEADOR:', 6.2);
+  const employerColumns = [28, 20, 57, 54, 35];
+  const employerHeaders = [
+    '1. RAZÓN SOCIAL O DENOMINACIÓN SOCIAL',
+    '2. RUC',
+    '3. DOMICILIO (Dirección, distrito, departamento, provincia)',
+    '4. ACTIVIDAD ECONÓMICA',
+    '5. N° TRABAJADORES EN EL CENTRO LABORAL',
   ];
-  const fieldGap = 3;
-  const fieldWidth = (contentWidth - fieldGap) / 2;
-  for (let index = 0; index < employer.length; index += 2) {
-    const row = employer.slice(index, index + 2);
-    const fieldData = row.map(([label, value]) => ({ labelLines: wrapped(label, fieldWidth - 6, 5.5), valueLines: wrapped(value, fieldWidth - 6, 7) }));
-    const rowHeight = Math.max(18, ...fieldData.map(({ labelLines, valueLines }) => 8 + Math.max(labelLines.length * 2.5, valueLines.length * 3.2)));
-    row.forEach((_entry, column) => {
-      const x = margin + column * (fieldWidth + fieldGap);
-      const { labelLines, valueLines } = fieldData[column];
-      doc.rect(x, y, fieldWidth, rowHeight);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(5.5);
-      doc.text(labelLines, x + fieldWidth / 2, y + 5, { align: 'center', lineHeightFactor: 1.05 });
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7);
-      doc.text(valueLines, x + 3, y + rowHeight - Math.max(4, valueLines.length * 3.2), { lineHeightFactor: 1.1 });
-    });
-    y += rowHeight;
-  }
-  y += 8;
-
-  sectionTitle('TIPO DE EQUIPO DE SEGURIDAD O EMERGENCIA ENTREGADO');
-  const typeWidth = (contentWidth - 3) / 2;
-  const typeLabels = [
-    `${delivery.type === 'personal' ? 'X  ' : ''}EQUIPO DE PROTECCIÓN PERSONAL`,
-    `${delivery.type === 'emergencia' ? 'X  ' : ''}EQUIPO DE EMERGENCIA`,
+  const employerValues = [
+    'Industrias Andinas S.A.C.',
+    '20604578129',
+    'Av. Néstor Gambetta 1450, Callao',
+    'Logística y distribución',
+    '86',
   ];
-  typeLabels.forEach((label, index) => {
-    const x = margin + index * (typeWidth + 3);
-    doc.rect(x, y, typeWidth, 15);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7);
-    doc.text(wrapped(label, typeWidth - 8, 7), x + typeWidth / 2, y + 8, { align: 'center' });
-  });
-  y += 23;
-
-  sectionTitle('EQUIPOS DE SEGURIDAD O EMERGENCIA ENTREGADOS');
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
-  delivery.items.filter((item) => item.checked).forEach((item) => {
-    const text = `${item.name} | ${item.standard} | Talla: ${item.size} | Cantidad: ${item.quantity} | ${item.reason}`;
-    const lines = wrapped(text, contentWidth - 6, 7);
-    const rowHeight = Math.max(8, lines.length * 3.5 + 4);
-    ensureSpace(rowHeight + 2, 'EQUIPOS ENTREGADOS (CONTINUACIÓN)');
-    doc.text(lines, margin + 3, y + 4, { lineHeightFactor: 1.1 });
-    line(y + rowHeight);
-    y += rowHeight;
-  });
-  y += 7;
-
-  ensureSpace(47, 'DATOS DEL TRABAJADOR (CONTINUACIÓN)');
-  sectionTitle('LISTA DE DATOS DEL TRABAJADOR');
-  const columns = [8, 54, 20, 30, 25, 24, 25];
-  const headers = ['N°', 'NOMBRES Y APELLIDOS', 'DNI', 'ÁREA', 'FECHA DE ENTREGA', 'FECHA DE RENOVACIÓN', 'FIRMA'];
-  const values = ['1', worker?.name ?? '', worker?.dni ?? '', worker?.area ?? '', '25/10/2026', worker?.renewal ?? '—', ''];
-  const headerHeight = 14;
-  const dataLines = values.map((value, index) => wrapped(value, columns[index] - 5, 6.5));
-  const dataHeight = Math.max(30, 10 + Math.max(...dataLines.map((lines) => lines.length * 3.2)));
+  const employerHeaderHeight = 11;
+  const employerValueHeight = 16;
   let x = margin;
-  headers.forEach((header, index) => {
-    doc.rect(x, y, columns[index], headerHeight);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(5.5);
-    doc.text(wrapped(header, columns[index] - 4, 5.5), x + columns[index] / 2, y + 5, { align: 'center', lineHeightFactor: 1.05 });
-    x += columns[index];
+  employerColumns.forEach((columnWidth, index) => {
+    doc.rect(x, y, columnWidth, employerHeaderHeight);
+    centeredText(employerHeaders[index], x, y, columnWidth, employerHeaderHeight, 4.8, true);
+    x += columnWidth;
   });
   x = margin;
-  values.forEach((value, index) => {
-    doc.rect(x, y + headerHeight, columns[index], dataHeight);
-    if (index !== 6) {
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(6.5);
-      doc.text(dataLines[index], index === 1 ? x + 2 : x + columns[index] / 2, y + headerHeight + 8, { align: index === 1 ? 'left' : 'center', lineHeightFactor: 1.1 });
-    }
-    if (index === 6 && delivery.workerSignature) doc.addImage(delivery.workerSignature, 'PNG', x + 1, y + headerHeight + 8, columns[index] - 2, 14);
-    x += columns[index];
+  employerColumns.forEach((columnWidth, index) => {
+    doc.rect(x, y + employerHeaderHeight, columnWidth, employerValueHeight);
+    centeredText(employerValues[index], x, y + employerHeaderHeight, columnWidth, employerValueHeight, 5.8);
+    x += columnWidth;
   });
-  y += headerHeight + dataHeight + 9;
+  y += employerHeaderHeight + employerValueHeight + 3;
 
-  ensureSpace(62, 'RESPONSABLE DEL REGISTRO (CONTINUACIÓN)');
-  sectionTitle('RESPONSABLE DEL REGISTRO');
-  const responsibleY = y;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
-  doc.text('Nombre:', margin, responsibleY + 7);
-  doc.text('Cargo:', margin, responsibleY + 16);
-  doc.text('Fecha:', margin, responsibleY + 25);
-  doc.text('Ana Torres', margin + 22, responsibleY + 7);
-  doc.text('Responsable de almacén', margin + 22, responsibleY + 16);
-  doc.text('25/10/2026', margin + 22, responsibleY + 25);
-  doc.rect(122, responsibleY, 42, 34);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Firma', 143, responsibleY + 7, { align: 'center' });
-  if (delivery.delivererSignature) doc.addImage(delivery.delivererSignature, 'PNG', 124, responsibleY + 11, 38, 19);
-  if (includeCosts) {
-    doc.setFontSize(7);
-    doc.text(`Total interno: ${formatMoney(delivery.items.filter((item) => item.checked).reduce((sum, item) => sum + item.unitCost * item.quantity, 0))}`, margin, responsibleY + 38);
+  drawFullRow(5, 'MARCAR (X)', 6.2);
+  drawFullRow(5, 'TIPO DE EQUIPO DE SEGURIDAD O EMERGENCIA ENTREGADO', 6.2);
+  const typeWidth = contentWidth / 2;
+  doc.rect(margin, y, typeWidth, 7);
+  doc.rect(margin + typeWidth, y, typeWidth, 7);
+  centeredText('EQUIPO DE PROTECCIÓN PERSONAL', margin, y, typeWidth, 7, 5.8, true);
+  centeredText('EQUIPO DE EMERGENCIA', margin + typeWidth, y, typeWidth, 7, 5.8, true);
+  y += 7;
+  doc.rect(margin, y, typeWidth, 12);
+  doc.rect(margin + typeWidth, y, typeWidth, 12);
+  centeredText(delivery.type === 'personal' ? 'X' : '', margin, y, typeWidth, 12, 10, true);
+  centeredText(delivery.type === 'emergencia' ? 'X' : '', margin + typeWidth, y, typeWidth, 12, 10, true);
+  y += 15;
+
+  drawFullRow(6, 'NOMBRE(S) DEL(LOS) EQUIPO(S) DE SEGURIDAD O EMERGENCIA ENTREGADO', 5.8);
+  const equipmentRowHeight = 7;
+  const visibleEquipmentRows = 6;
+  for (let index = 0; index < visibleEquipmentRows; index += 1) {
+    const item = checkedItems[index];
+    const text = item ? `${item.name} | ${item.standard} | Talla: ${item.size} | Cantidad: ${item.quantity} | ${item.reason}` : '';
+    drawEquipmentRow(text, equipmentRowHeight);
   }
+
+  if (checkedItems.length > visibleEquipmentRows) {
+    startContinuationPage('EQUIPOS ENTREGADOS (CONTINUACIÓN)');
+    checkedItems.slice(visibleEquipmentRows).forEach((item) => {
+      ensureSpace(equipmentRowHeight + 2, 'EQUIPOS ENTREGADOS (CONTINUACIÓN)');
+      drawEquipmentRow(`${item.name} | ${item.standard} | Talla: ${item.size} | Cantidad: ${item.quantity} | ${item.reason}`, equipmentRowHeight);
+    });
+    y += 5;
+  }
+
+  ensureSpace(120, 'LISTA DE DATOS DEL TRABAJADOR (CONTINUACIÓN)');
+  drawFullRow(6, 'LISTA DE DATOS DEL(LOS) TRABAJADOR(ES)', 5.8);
+  const workerColumns = [7, 59, 18, 28, 25, 25, 32];
+  const workerHeaders = ['N°', 'NOMBRES Y APELLIDOS', 'DNI', 'ÁREA', 'FECHA DE ENTREGA', 'FECHA DE RENOVACIÓN', 'FIRMA'];
+  const workerHeaderHeight = 12;
+  const workerRowHeight = 17;
+  x = margin;
+  workerColumns.forEach((columnWidth, index) => {
+    doc.rect(x, y, columnWidth, workerHeaderHeight);
+    centeredText(workerHeaders[index], x, y, columnWidth, workerHeaderHeight, 5.1, true);
+    x += columnWidth;
+  });
+  const workerValues = [worker?.name ?? '', worker?.dni ?? '', worker?.area ?? '', '25/10/2026', worker?.renewal ?? '—'];
+  for (let rowIndex = 0; rowIndex < 6; rowIndex += 1) {
+    x = margin;
+    workerColumns.forEach((columnWidth, columnIndex) => {
+      doc.rect(x, y + workerHeaderHeight + rowIndex * workerRowHeight, columnWidth, workerRowHeight);
+      if (rowIndex === 0 && columnIndex === 0) centeredText('1', x, y + workerHeaderHeight, columnWidth, workerRowHeight, 6.2);
+      if (rowIndex === 0 && columnIndex > 0 && columnIndex < 6) {
+        const value = workerValues[columnIndex - 1];
+        centeredText(value, x, y + workerHeaderHeight, columnWidth, workerRowHeight, columnIndex === 1 ? 5.6 : 5.8);
+      }
+      if (rowIndex === 0 && columnIndex === 6 && delivery.workerSignature) {
+        doc.addImage(delivery.workerSignature, 'PNG', x + 2, y + workerHeaderHeight + 2, columnWidth - 4, workerRowHeight - 4);
+      }
+      x += columnWidth;
+    });
+  }
+  y += workerHeaderHeight + workerRowHeight * 6 + 3;
+
+  ensureSpace(34, 'RESPONSABLE DEL REGISTRO (CONTINUACIÓN)');
+  drawFullRow(6, 'RESPONSABLE DEL REGISTRO', 5.8);
+  const responsibleHeight = 24;
+  const responsibleInfoWidth = 63;
+  const responsibleSignatureWidth = 18;
+  doc.rect(margin, y, contentWidth, responsibleHeight);
+  doc.line(margin + responsibleInfoWidth, y, margin + responsibleInfoWidth, y + responsibleHeight);
+  doc.line(margin + responsibleInfoWidth + responsibleSignatureWidth, y, margin + responsibleInfoWidth + responsibleSignatureWidth, y + responsibleHeight);
+  doc.line(margin, y + 8, margin + responsibleInfoWidth, y + 8);
+  doc.line(margin, y + 16, margin + responsibleInfoWidth, y + 16);
+  leftText('Nombre:', margin, y, 20, 8, 5.8);
+  leftText('Ana Torres', margin + 20, y, responsibleInfoWidth - 20, 8, 5.8);
+  leftText('Cargo:', margin, y + 8, 20, 8, 5.8);
+  leftText('Responsable de almacén', margin + 20, y + 8, responsibleInfoWidth - 20, 8, 5.8);
+  leftText('Fecha:', margin, y + 16, 20, 8, 5.8);
+  leftText('25/10/2026', margin + 20, y + 16, responsibleInfoWidth - 20, 8, 5.8);
+  centeredText('Firma', margin + responsibleInfoWidth, y, responsibleSignatureWidth, responsibleHeight, 5.8);
+  const signatureX = margin + responsibleInfoWidth + responsibleSignatureWidth;
+  if (delivery.delivererSignature) doc.addImage(delivery.delivererSignature, 'PNG', signatureX + 3, y + 3, contentWidth - responsibleInfoWidth - responsibleSignatureWidth - 6, responsibleHeight - 6);
+  y += responsibleHeight + 2;
+
   const legalText = 'Tratamiento de datos personales conforme a la Ley 29733. La información será utilizada exclusivamente para la gestión de seguridad y salud en el trabajo.';
-  const legalY = includeCosts ? responsibleY + 45 : responsibleY + 39;
+  const legalWidth = includeCosts ? contentWidth - 55 : contentWidth;
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6.2);
-  doc.text(wrapped(legalText, contentWidth, 6.2), margin, legalY, { lineHeightFactor: 1.15 });
+  doc.setFontSize(4.6);
+  doc.text(split(legalText, legalWidth, 4.6), margin, y + 3, { lineHeightFactor: 1.05 });
+  if (includeCosts) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(5.8);
+    doc.text(`Total interno: ${formatMoney(checkedItems.reduce((sum, item) => sum + item.unitCost * item.quantity, 0))}`, margin + contentWidth - 52, y + 3, { maxWidth: 52 });
+  }
   doc.save(`${code}.pdf`);
 }
 
