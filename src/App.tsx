@@ -318,7 +318,174 @@ function ReviewStep({ delivery, isAdmin, total }: { delivery: DeliveryState; isA
 
 function ConfirmationScreen({ delivery, includeCosts, onNew, onDone }: { delivery: DeliveryState; includeCosts: boolean; onNew: () => void; onDone: () => void }) { const [downloading, setDownloading] = useState(false); const code = `EPP-2026-${delivery.worker?.dni ?? '000000'}-001`; const download = () => { setDownloading(true); generatePdf(delivery, code, includeCosts); setTimeout(() => setDownloading(false), 650); }; return <div className="confirmation-screen"><div className="success-orb"><Check size={36} /></div><span className="eyebrow">ENTREGA REGISTRADA</span><h1>¡Entrega completada!</h1><p>El registro de <strong>{delivery.worker?.name}</strong> está listo y firmado.</p><div className="confirmation-code"><span>CÓDIGO ÚNICO</span><strong>{code}</strong><button className="icon-button"><FileText size={16} /></button></div><div className="confirmation-actions"><button className="primary-button" onClick={download} disabled={downloading}><Download size={18} /> {downloading ? 'Generando PDF…' : 'Descargar PDF'}</button><button className="secondary-button"><Truck size={17} /> Compartir</button></div><button className="text-button new-delivery-button" onClick={onNew}><Plus size={16} /> Registrar otra entrega</button><button className="back-link" onClick={onDone}>Volver al inicio</button></div>; }
 
-function generatePdf(delivery: DeliveryState, code: string, includeCosts: boolean) { const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' }); const margin = 10; const width = 277; const worker = delivery.worker; const line = (y: number, x1 = margin, x2 = margin + width) => doc.line(x1, y, x2, y); doc.setDrawColor(43, 55, 66); doc.setLineWidth(0.35); doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.text('SEGUREPP', 18, 18); doc.setFontSize(13); doc.text('REGISTRO DE EQUIPOS DE SEGURIDAD O EMERGENCIA', 82, 18); doc.setFontSize(8); doc.text('CÓDIGO:', 244, 12); doc.setFont('helvetica', 'normal'); doc.text(code, 244, 17); doc.setFont('helvetica', 'bold'); doc.text('VERSIÓN:', 244, 24); doc.setFont('helvetica', 'normal'); doc.text('01', 244, 29); line(33); doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.text('DATOS DEL EMPLEADOR', 12, 39); line(42); const employer = [['1. RAZÓN SOCIAL O DENOMINACIÓN SOCIAL', 'Industrias Andinas S.A.C.'], ['2. RUC', '20604578129'], ['3. DOMICILIO', 'Av. Néstor Gambetta 1450, Callao'], ['4. ACTIVIDAD ECONÓMICA', 'Logística y distribución'], ['5. N° TRABAJADORES', '86']]; let x = margin; employer.forEach(([label, value], index) => { const w = [48, 30, 70, 75, 54][index]; doc.rect(x, 42, w, 25); doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.text(label, x + w / 2, 48, { align: 'center', maxWidth: w - 4 }); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.text(value, x + 3, 60, { maxWidth: w - 6 }); x += w; }); doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.text('MARCAR (X)', 132, 72); line(76); doc.text('TIPO DE EQUIPO DE SEGURIDAD O EMERGENCIA ENTREGADO', 98, 82); doc.rect(margin, 84, width / 2, 12); doc.rect(margin + width / 2, 84, width / 2, 12); doc.setFontSize(8); doc.text(delivery.type === 'personal' ? 'X  EQUIPO DE PROTECCIÓN PERSONAL' : 'EQUIPO DE PROTECCIÓN PERSONAL', 55, 92, { align: 'center' }); doc.text(delivery.type === 'emergencia' ? 'X  EQUIPO DE EMERGENCIA' : 'EQUIPO DE EMERGENCIA', 205, 92, { align: 'center' }); line(100); doc.text('NOMBRE(S) DEL(LOS) EQUIPO(S) DE SEGURIDAD O EMERGENCIA ENTREGADO', 77, 106); line(109); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); let y = 117; delivery.items.filter((item) => item.checked).forEach((item) => { doc.text(`${item.name} | ${item.standard} | Talla: ${item.size} | Cantidad: ${item.quantity} | ${item.reason}`, 14, y); line(y + 3); y += 8; }); while (y < 150) { line(y); y += 8; } doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.text('LISTA DE DATOS DEL(LOS) TRABAJADOR(ES)', 12, 157); line(160); const cols = [8, 90, 26, 40, 37, 37, 39]; let cx = margin; ['N°', 'NOMBRES Y APELLIDOS', 'DNI', 'ÁREA', 'FECHA DE ENTREGA', 'FECHA DE RENOVACIÓN', 'FIRMA'].forEach((label, i) => { doc.rect(cx, 160, cols[i], 28); doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.text(label, cx + cols[i] / 2, 166, { align: 'center', maxWidth: cols[i] - 3 }); cx += cols[i]; }); cx = margin; const values = ['1', worker?.name ?? '', worker?.dni ?? '', worker?.area ?? '', '25/10/2026', worker?.renewal ?? '—', '']; values.forEach((value, i) => { doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.text(value, cx + (i === 1 ? 3 : cols[i] / 2), 178, { align: i === 1 ? 'left' : 'center', maxWidth: cols[i] - 5 }); cx += cols[i]; }); if (delivery.workerSignature) doc.addImage(delivery.workerSignature, 'PNG', 237, 168, 35, 15); doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.text('RESPONSABLE DEL REGISTRO', 113, 195); line(198); doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.text('Nombre:', 12, 207); doc.text('Cargo:', 12, 218); doc.text('Fecha:', 12, 229); doc.text('Ana Torres', 32, 207); doc.text('Responsable de almacén', 32, 218); doc.text('25/10/2026', 32, 229); doc.rect(87, 198, 42, 34); doc.setFont('helvetica', 'bold'); doc.text('Firma', 108, 216, { align: 'center' }); if (delivery.delivererSignature) doc.addImage(delivery.delivererSignature, 'PNG', 130, 201, 45, 22); doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.text('Tratamiento de datos personales conforme a la Ley 29733. La información será utilizada exclusivamente para la gestión de seguridad y salud en el trabajo.', 183, 226, { maxWidth: 95 }); if (includeCosts) { doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.text(`Total interno: ${formatMoney(delivery.items.filter((item) => item.checked).reduce((sum, item) => sum + item.unitCost * item.quantity, 0))}`, 183, 217); } doc.save(`${code}.pdf`); }
+function generatePdf(delivery: DeliveryState, code: string, includeCosts: boolean) {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const margin = 12;
+  const contentWidth = 186;
+  const bottom = 285;
+  const worker = delivery.worker;
+  let y = 15;
+
+  const wrapped = (value: string, width: number, size: number) => {
+    doc.setFontSize(size);
+    return doc.splitTextToSize(value || '—', width);
+  };
+  const line = (lineY: number) => doc.line(margin, lineY, margin + contentWidth, lineY);
+  const newPage = (label: string) => {
+    doc.addPage();
+    y = 17;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(43, 55, 66);
+    doc.text(label, margin, y);
+    line(y + 4);
+    y += 12;
+  };
+  const ensureSpace = (height: number, label: string) => {
+    if (y + height > bottom) newPage(label);
+  };
+  const sectionTitle = (title: string) => {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(43, 55, 66);
+    doc.text(title, margin, y);
+    line(y + 3);
+    y += 9;
+  };
+
+  doc.setDrawColor(43, 55, 66);
+  doc.setTextColor(23, 50, 77);
+  doc.setLineWidth(0.35);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(15);
+  doc.text('SEGUREPP', margin, y + 3);
+  const titleLines = wrapped('REGISTRO DE EQUIPOS DE SEGURIDAD O EMERGENCIA', 112, 10.5);
+  doc.text(titleLines, 50, y + 1, { lineHeightFactor: 1.15 });
+  doc.setFontSize(7);
+  doc.text('CÓDIGO:', 164, y);
+  doc.setFont('helvetica', 'normal');
+  doc.text(code, 164, y + 5, { maxWidth: 34 });
+  doc.setFont('helvetica', 'bold');
+  doc.text('VERSIÓN:', 164, y + 12);
+  doc.setFont('helvetica', 'normal');
+  doc.text('01', 164, y + 17);
+  y = 34;
+  line(y);
+  y += 9;
+
+  sectionTitle('DATOS DEL EMPLEADOR');
+  const employer: Array<[string, string]> = [
+    ['1. RAZÓN SOCIAL O DENOMINACIÓN SOCIAL', 'Industrias Andinas S.A.C.'],
+    ['2. RUC', '20604578129'],
+    ['3. DOMICILIO', 'Av. Néstor Gambetta 1450, Callao'],
+    ['4. ACTIVIDAD ECONÓMICA', 'Logística y distribución'],
+    ['5. N° TRABAJADORES', '86'],
+  ];
+  const fieldGap = 3;
+  const fieldWidth = (contentWidth - fieldGap) / 2;
+  for (let index = 0; index < employer.length; index += 2) {
+    const row = employer.slice(index, index + 2);
+    const fieldData = row.map(([label, value]) => ({ labelLines: wrapped(label, fieldWidth - 6, 5.5), valueLines: wrapped(value, fieldWidth - 6, 7) }));
+    const rowHeight = Math.max(18, ...fieldData.map(({ labelLines, valueLines }) => 8 + Math.max(labelLines.length * 2.5, valueLines.length * 3.2)));
+    row.forEach((_entry, column) => {
+      const x = margin + column * (fieldWidth + fieldGap);
+      const { labelLines, valueLines } = fieldData[column];
+      doc.rect(x, y, fieldWidth, rowHeight);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(5.5);
+      doc.text(labelLines, x + fieldWidth / 2, y + 5, { align: 'center', lineHeightFactor: 1.05 });
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.text(valueLines, x + 3, y + rowHeight - Math.max(4, valueLines.length * 3.2), { lineHeightFactor: 1.1 });
+    });
+    y += rowHeight;
+  }
+  y += 8;
+
+  sectionTitle('TIPO DE EQUIPO DE SEGURIDAD O EMERGENCIA ENTREGADO');
+  const typeWidth = (contentWidth - 3) / 2;
+  const typeLabels = [
+    `${delivery.type === 'personal' ? 'X  ' : ''}EQUIPO DE PROTECCIÓN PERSONAL`,
+    `${delivery.type === 'emergencia' ? 'X  ' : ''}EQUIPO DE EMERGENCIA`,
+  ];
+  typeLabels.forEach((label, index) => {
+    const x = margin + index * (typeWidth + 3);
+    doc.rect(x, y, typeWidth, 15);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.text(wrapped(label, typeWidth - 8, 7), x + typeWidth / 2, y + 8, { align: 'center' });
+  });
+  y += 23;
+
+  sectionTitle('EQUIPOS DE SEGURIDAD O EMERGENCIA ENTREGADOS');
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  delivery.items.filter((item) => item.checked).forEach((item) => {
+    const text = `${item.name} | ${item.standard} | Talla: ${item.size} | Cantidad: ${item.quantity} | ${item.reason}`;
+    const lines = wrapped(text, contentWidth - 6, 7);
+    const rowHeight = Math.max(8, lines.length * 3.5 + 4);
+    ensureSpace(rowHeight + 2, 'EQUIPOS ENTREGADOS (CONTINUACIÓN)');
+    doc.text(lines, margin + 3, y + 4, { lineHeightFactor: 1.1 });
+    line(y + rowHeight);
+    y += rowHeight;
+  });
+  y += 7;
+
+  ensureSpace(47, 'DATOS DEL TRABAJADOR (CONTINUACIÓN)');
+  sectionTitle('LISTA DE DATOS DEL TRABAJADOR');
+  const columns = [8, 54, 20, 30, 25, 24, 25];
+  const headers = ['N°', 'NOMBRES Y APELLIDOS', 'DNI', 'ÁREA', 'FECHA DE ENTREGA', 'FECHA DE RENOVACIÓN', 'FIRMA'];
+  const values = ['1', worker?.name ?? '', worker?.dni ?? '', worker?.area ?? '', '25/10/2026', worker?.renewal ?? '—', ''];
+  const headerHeight = 14;
+  const dataLines = values.map((value, index) => wrapped(value, columns[index] - 5, 6.5));
+  const dataHeight = Math.max(30, 10 + Math.max(...dataLines.map((lines) => lines.length * 3.2)));
+  let x = margin;
+  headers.forEach((header, index) => {
+    doc.rect(x, y, columns[index], headerHeight);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(5.5);
+    doc.text(wrapped(header, columns[index] - 4, 5.5), x + columns[index] / 2, y + 5, { align: 'center', lineHeightFactor: 1.05 });
+    x += columns[index];
+  });
+  x = margin;
+  values.forEach((value, index) => {
+    doc.rect(x, y + headerHeight, columns[index], dataHeight);
+    if (index !== 6) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6.5);
+      doc.text(dataLines[index], index === 1 ? x + 2 : x + columns[index] / 2, y + headerHeight + 8, { align: index === 1 ? 'left' : 'center', lineHeightFactor: 1.1 });
+    }
+    if (index === 6 && delivery.workerSignature) doc.addImage(delivery.workerSignature, 'PNG', x + 1, y + headerHeight + 8, columns[index] - 2, 14);
+    x += columns[index];
+  });
+  y += headerHeight + dataHeight + 9;
+
+  ensureSpace(62, 'RESPONSABLE DEL REGISTRO (CONTINUACIÓN)');
+  sectionTitle('RESPONSABLE DEL REGISTRO');
+  const responsibleY = y;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.text('Nombre:', margin, responsibleY + 7);
+  doc.text('Cargo:', margin, responsibleY + 16);
+  doc.text('Fecha:', margin, responsibleY + 25);
+  doc.text('Ana Torres', margin + 22, responsibleY + 7);
+  doc.text('Responsable de almacén', margin + 22, responsibleY + 16);
+  doc.text('25/10/2026', margin + 22, responsibleY + 25);
+  doc.rect(122, responsibleY, 42, 34);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Firma', 143, responsibleY + 7, { align: 'center' });
+  if (delivery.delivererSignature) doc.addImage(delivery.delivererSignature, 'PNG', 124, responsibleY + 11, 38, 19);
+  if (includeCosts) {
+    doc.setFontSize(7);
+    doc.text(`Total interno: ${formatMoney(delivery.items.filter((item) => item.checked).reduce((sum, item) => sum + item.unitCost * item.quantity, 0))}`, margin, responsibleY + 38);
+  }
+  const legalText = 'Tratamiento de datos personales conforme a la Ley 29733. La información será utilizada exclusivamente para la gestión de seguridad y salud en el trabajo.';
+  const legalY = includeCosts ? responsibleY + 45 : responsibleY + 39;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.2);
+  doc.text(wrapped(legalText, contentWidth, 6.2), margin, legalY, { lineHeightFactor: 1.15 });
+  doc.save(`${code}.pdf`);
+}
 
 function WorkersScreen({ workers, sites, isAdmin, onWorkerCreated, onWorkersImported, onWorkerUpdated, onWorkerDeleted, onSiteCreated }: { workers: Worker[]; sites: Site[]; isAdmin: boolean; onWorkerCreated: (worker: Worker) => void; onWorkersImported: (workers: Worker[]) => void; onWorkerUpdated: (worker: Worker) => void; onWorkerDeleted: (id: string) => void; onSiteCreated: (site: Site) => void }) { const [showNewWorker, setShowNewWorker] = useState(false); const [showBulkImport, setShowBulkImport] = useState(false); const [detailWorker, setDetailWorker] = useState<Worker | null>(null); const [editWorker, setEditWorker] = useState<Worker | null>(null); const [deleteWorker, setDeleteWorker] = useState<Worker | null>(null); const saveWorker = (worker: Worker) => { if (workers.some((item) => item.dni === worker.dni)) return; onWorkerCreated(worker); setShowNewWorker(false); }; const toggleActive = (worker: Worker) => onWorkerUpdated({ ...worker, active: !worker.active }); return <><ListScreen eyebrow="MAESTROS" title="Trabajadores" titleIcon={Users} description="Administra las fichas y el historial de entrega del personal." action="Nuevo trabajador" onAction={() => setShowNewWorker(true)}><div className="worker-toolbar"><div className="toolbar"><div className="search-box compact"><Search size={18} /><input placeholder="Buscar por nombre o DNI…" /></div><button className="secondary-button"><SlidersHorizontal size={16} /> Filtrar</button></div><div className="bulk-actions"><button className="secondary-button" onClick={downloadWorkerTemplate}><FileSpreadsheet size={16} /> Descargar plantilla Excel</button><button className="secondary-button" onClick={() => setShowBulkImport(true)}><Upload size={16} /> Subir trabajadores</button></div></div><div className="worker-table-scroll"><div className="data-table worker-table-shell"><div className="table-head worker-table-head"><span className="sortable-heading">TRABAJADOR <ChevronsUpDown size={12} /></span><span className="sortable-heading">ÁREA / PUESTO <ChevronsUpDown size={12} /></span><span className="sortable-heading">SEDE <ChevronsUpDown size={12} /></span><span className="sortable-heading">ÚLTIMA ENTREGA <ChevronsUpDown size={12} /></span><span className="sortable-heading">ESTADO <ChevronsUpDown size={12} /></span>{isAdmin && <span>ACCIONES</span>}</div>{workers.map((worker) => <div className={`table-row worker-table-row ${worker.active ? '' : 'inactive-row'}`} key={worker.id}><div className="table-person"><div className="person-avatar">{worker.name.split(' ').map((part) => part[0]).slice(0, 2).join('')}</div><div><strong>{worker.name}</strong><span className="worker-dni">DNI {worker.dni}</span></div></div><span className="worker-area-cell">{worker.area}<i />{worker.position}</span><span className="worker-site-cell"><MapPin size={14} />{worker.site}</span><span className="worker-date-cell"><CalendarDays size={14} />04 mar 2026</span><b className={`table-status ${worker.active ? '' : 'inactive'}`}>{worker.active ? 'Activo' : 'Inactivo'}</b>{isAdmin && <div className="row-actions"><button className="icon-button" title="Ver ficha" aria-label={`Ver ficha de ${worker.name}`} onClick={() => setDetailWorker(worker)}><Eye size={15} /></button><button className="icon-button" title="Editar" aria-label={`Editar a ${worker.name}`} onClick={() => setEditWorker(worker)}><Pencil size={15} /></button><button className={`icon-button ${worker.active ? '' : 'state-on'}`} title={worker.active ? 'Desactivar' : 'Activar'} aria-label={`${worker.active ? 'Desactivar' : 'Activar'} a ${worker.name}`} onClick={() => toggleActive(worker)}><Power size={15} /></button><button className="icon-button danger" title="Eliminar" aria-label={`Eliminar a ${worker.name}`} onClick={() => setDeleteWorker(worker)}><Trash2 size={15} /></button></div>}</div>)}</div><div className="table-scroll-hint"><ArrowRight size={14} /> Desliza horizontalmente para ver todas las columnas</div></div></ListScreen>{showNewWorker && <NewWorkerModal sites={sites} onSiteCreated={onSiteCreated} onClose={() => setShowNewWorker(false)} onSave={saveWorker} />}{showBulkImport && <BulkWorkerModal existingWorkers={workers} sites={sites} onClose={() => setShowBulkImport(false)} onImport={(importedWorkers) => { onWorkersImported(importedWorkers); setShowBulkImport(false); }} />}{detailWorker && <WorkerDetailModal worker={detailWorker} onClose={() => setDetailWorker(null)} />}{editWorker && <EditWorkerModal sites={sites} worker={editWorker} onSiteCreated={onSiteCreated} onClose={() => setEditWorker(null)} onSave={(updated) => { onWorkerUpdated(updated); setEditWorker(null); }} />}{deleteWorker && <ConfirmDeleteWorkerModal worker={deleteWorker} onClose={() => setDeleteWorker(null)} onConfirm={() => { onWorkerDeleted(deleteWorker.id); setDeleteWorker(null); }} />}</>; }
 function WorkerDetailModal({ worker, onClose }: { worker: Worker; onClose: () => void }) { return <Modal title="Ficha del trabajador" onClose={onClose}><p className="modal-copy">Datos registrados de {worker.name}.</p><div className="detail-grid"><div><span>Nombre completo</span><strong>{worker.name}</strong></div><div><span>DNI</span><strong>{worker.dni}</strong></div><div><span>Área</span><strong>{worker.area}</strong></div><div><span>Puesto</span><strong>{worker.position}</strong></div><div><span>Sede</span><strong>{worker.site}</strong></div><div><span>Tallas (casco / calzado)</span><strong>{worker.sizes}</strong></div><div><span>Próxima renovación</span><strong>{worker.renewal}</strong></div><div><span>Estado</span><strong>{worker.active ? 'Activo' : 'Inactivo'}</strong></div></div><button className="primary-button full" onClick={onClose}>Cerrar</button></Modal>; }
